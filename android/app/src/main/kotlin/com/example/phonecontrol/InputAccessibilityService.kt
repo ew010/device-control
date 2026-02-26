@@ -9,6 +9,7 @@ import android.graphics.Path
 import android.os.Build
 import android.os.Bundle
 import android.util.DisplayMetrics
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -34,17 +35,24 @@ class InputAccessibilityService : AccessibilityService() {
     }
 
     private fun toAbsX(xNorm: Double): Float {
-        val m = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        windowManager.defaultDisplay.getRealMetrics(m)
+        val m = screenMetrics()
         return (m.widthPixels * xNorm.coerceIn(0.0, 1.0)).toFloat()
     }
 
     private fun toAbsY(yNorm: Double): Float {
-        val m = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        windowManager.defaultDisplay.getRealMetrics(m)
+        val m = screenMetrics()
         return (m.heightPixels * yNorm.coerceIn(0.0, 1.0)).toFloat()
+    }
+
+    private fun screenMetrics(): DisplayMetrics {
+        val m = DisplayMetrics()
+        val wm = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+        @Suppress("DEPRECATION")
+        wm?.defaultDisplay?.getRealMetrics(m)
+        if (m.widthPixels <= 0 || m.heightPixels <= 0) {
+            return resources.displayMetrics
+        }
+        return m
     }
 
     private fun dispatchPath(path: Path, durationMs: Long): Boolean {
