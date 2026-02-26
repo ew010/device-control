@@ -11,6 +11,10 @@
   - 被控端（Agent）：启动 WebSocket 服务，接收控制命令
   - 控制端（Controller）：连接被控端，发送点击/拖拽/文本命令
 - 配对码鉴权：控制端必须输入正确配对码才能下发命令
+- 原生输入注入（被控端）：
+  - Android: AccessibilityService 手势注入（tap/drag/text）
+  - Windows: Win32 `SendInput`（tap/drag/text）
+  - macOS: Quartz `CGEvent`（tap/drag/text）
 - 实时状态回传：被控端会把最后命令与指针坐标回传到控制端
 - 可作为远程控制协议骨架继续扩展（认证、加密、屏幕推流、平台原生输入注入）
 
@@ -37,6 +41,10 @@ flutter run
 - iOS/iPadOS 无法在纯 Flutter 层直接注入系统级触控去控制其他 App，这需要系统级权限或 MDM/企业方案。
 - Android/macOS/Windows 的“控制系统级界面”同样需要原生能力（Accessibility、输入驱动、系统 API）和额外授权。
 - 当前仓库提供的是可运行的跨端通信与控制协议骨架，不是绕过系统安全策略的完整远控实现。
+- 原生注入前置条件：
+  - Android: 需手动打开本 App 的无障碍服务
+  - macOS: 需在“隐私与安全性 -> 辅助功能”授权本 App
+  - Windows: 对高权限窗口注入可能受 UAC/完整性级别限制
 
 ## GitHub Actions（已配置）
 工作流文件：`.github/workflows/flutter-build.yml`

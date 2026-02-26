@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:phonecontrol/native_input_injector.dart';
 
 void main() {
   runApp(const RemoteControlApp());
@@ -224,6 +225,37 @@ class _AgentPageState extends State<AgentPage> {
                 const SizedBox(height: 8),
                 Text('连接设备数: ${_server.clientCount}'),
                 Text('已授权设备数: ${_server.authorizedClientCount}'),
+                if (Platform.isAndroid)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () async {
+                            final opened =
+                                await NativeInputInjector.openAccessibilitySettings();
+                            if (!context.mounted) {
+                              return;
+                            }
+                            _showSnack(opened ? '已打开无障碍设置' : '打开失败');
+                          },
+                          child: const Text('打开无障碍设置'),
+                        ),
+                        OutlinedButton(
+                          onPressed: () async {
+                            final status =
+                                await NativeInputInjector.getStatus();
+                            if (!context.mounted) {
+                              return;
+                            }
+                            _showSnack(status);
+                          },
+                          child: const Text('检查注入状态'),
+                        ),
+                      ],
+                    ),
+                  ),
                 const SizedBox(height: 16),
                 const Text('最近命令:'),
                 const SizedBox(height: 8),
@@ -768,6 +800,34 @@ class AgentServer extends ChangeNotifier {
     }
     _appendLog('cmd: ${_state.lastCommand} @ ${_state.cursor}');
     _emitState();
+    unawaited(_forwardToNative(data));
+  }
+
+  Future<void> _forwardToNative(Map<String, dynamic> data) async {
+    final command = data['command'] as String? ?? 'unknown';
+    late final String result;
+    switch (command) {
+      case 'tap':
+        result = await NativeInputInjector.injectTap(
+          x: _toDouble(data['x']),
+          y: _toDouble(data['y']),
+        );
+      case 'drag':
+        result = await NativeInputInjector.injectDrag(
+          fromX: _toDouble(data['fromX']),
+          fromY: _toDouble(data['fromY']),
+          toX: _toDouble(data['toX']),
+          toY: _toDouble(data['toY']),
+        );
+      case 'text':
+        result = await NativeInputInjector.injectText(
+          text: (data['text'] as String? ?? '').trim(),
+        );
+      default:
+        result = 'unsupported command: $command';
+    }
+    _appendLog('native: $result');
+    notifyListeners();
   }
 
   double _toDouble(dynamic value) {
