@@ -15,6 +15,8 @@
   - Android: AccessibilityService 手势注入（tap/drag/text）
   - Windows: Win32 `SendInput`（tap/drag/text）
   - macOS: Quartz `CGEvent`（tap/drag/text）
+- scrcpy 集成（控制端，Windows/macOS）：
+  - 在控制端可直接发起 `adb connect` + `scrcpy -s <ip:port>` 镜像控制安卓设备
 - 实时状态回传：被控端会把最后命令与指针坐标回传到控制端
 - 可作为远程控制协议骨架继续扩展（认证、加密、屏幕推流、平台原生输入注入）
 
@@ -29,6 +31,7 @@ flutter run
 2. 记录 A 上显示的配对码
 3. 在设备 B 选择“控制端”，输入 A 的 IP+端口+配对码并连接
 4. 在控制面板点击/拖动/发送文本命令
+5. 在 Windows/macOS 控制端可选启用 scrcpy（ADB 端口默认 `5555`）
 
 ## 架构说明
 - 通信协议：JSON over WebSocket
@@ -45,6 +48,9 @@ flutter run
   - Android: 需手动打开本 App 的无障碍服务
   - macOS: 需在“隐私与安全性 -> 辅助功能”授权本 App
   - Windows: 对高权限窗口注入可能受 UAC/完整性级别限制
+- scrcpy 前置条件：
+  - 控制端机器已安装 `adb` 与 `scrcpy`，并加入 PATH
+  - 安卓设备已开启开发者选项与无线调试（或通过 USB + `adb tcpip 5555`）
 
 ## GitHub Actions（已配置）
 工作流文件：`.github/workflows/flutter-build.yml`

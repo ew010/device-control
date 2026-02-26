@@ -5,6 +5,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:phonecontrol/native_input_injector.dart';
+import 'package:phonecontrol/scrcpy_bridge.dart';
 
 void main() {
   runApp(const RemoteControlApp());
@@ -296,9 +297,13 @@ class ControllerPage extends StatefulWidget {
 
 class _ControllerPageState extends State<ControllerPage> {
   final ControllerClient _client = ControllerClient();
+  final ScrcpyBridge _scrcpy = ScrcpyBridge();
   final TextEditingController _hostController = TextEditingController();
   final TextEditingController _portController = TextEditingController(
     text: '8888',
+  );
+  final TextEditingController _adbPortController = TextEditingController(
+    text: '5555',
   );
   final TextEditingController _pairCodeController = TextEditingController();
   final TextEditingController _textController = TextEditingController();
@@ -307,9 +312,11 @@ class _ControllerPageState extends State<ControllerPage> {
   void dispose() {
     _hostController.dispose();
     _portController.dispose();
+    _adbPortController.dispose();
     _pairCodeController.dispose();
     _textController.dispose();
     _client.dispose();
+    _scrcpy.dispose();
     super.dispose();
   }
 
@@ -351,14 +358,35 @@ class _ControllerPageState extends State<ControllerPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> _toggleScrcpy() async {
+    if (_scrcpy.running) {
+      await _scrcpy.stop();
+      return;
+    }
+    final host = _hostController.text.trim();
+    final adbPort = int.tryParse(_adbPortController.text) ?? 5555;
+    if (host.isEmpty) {
+      _showSnack('请输入安卓设备IP后再启动 scrcpy');
+      return;
+    }
+    await _scrcpy.start(host: host, adbPort: adbPort);
+    if (!mounted) {
+      return;
+    }
+    if (_scrcpy.lastError != null) {
+      _showSnack(_scrcpy.lastError!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('控制端')),
       body: AnimatedBuilder(
-        animation: _client,
+        animation: Listenable.merge([_client, _scrcpy]),
         builder: (context, _) {
           final state = _client.lastState;
+          final supportScrcpy = Platform.isWindows || Platform.isMacOS;
           return Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -400,6 +428,38 @@ class _ControllerPageState extends State<ControllerPage> {
                 Text('连接状态: ${_client.connected ? '已连接' : '未连接'}'),
                 Text('鉴权状态: ${_client.authenticated ? '已授权' : '未授权'}'),
                 Text('会话信息: ${_client.sessionMessage}'),
+                if (supportScrcpy)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            const Text('scrcpy'),
+                            SizedBox(
+                              width: 130,
+                              child: TextField(
+                                controller: _adbPortController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'ADB端口',
+                                ),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: _toggleScrcpy,
+                              child: Text(_scrcpy.running ? '停止镜像' : '启动镜像'),
+                            ),
+                            Text(_scrcpy.status),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 Expanded(
                   child: RemoteSurface(
