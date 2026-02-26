@@ -17,6 +17,8 @@
   - macOS: Quartz `CGEvent`（tap/drag/text）
 - scrcpy 集成（控制端，Windows/macOS）：
   - 在控制端可直接发起 `adb connect` + `scrcpy -s <ip:port>` 镜像控制安卓设备
+- 安卓ADB直连（控制端为安卓）：
+  - 安卓控制端可直接连接目标 `adbd`，并用 `adb shell input` 执行 tap/drag/text
 - 实时状态回传：被控端会把最后命令与指针坐标回传到控制端
 - 可作为远程控制协议骨架继续扩展（认证、加密、屏幕推流、平台原生输入注入）
 
@@ -32,6 +34,7 @@ flutter run
 3. 在设备 B 选择“控制端”，输入 A 的 IP+端口+配对码并连接
 4. 在控制面板点击/拖动/发送文本命令
 5. 在 Windows/macOS 控制端可选启用 scrcpy（ADB 端口默认 `5555`）
+6. 在安卓控制端可开启“安卓ADB直连”开关并重连（目标设备需已开启ADB TCP调试）
 
 ## 架构说明
 - 通信协议：JSON over WebSocket
@@ -51,6 +54,9 @@ flutter run
 - scrcpy 前置条件：
   - 控制端机器已安装 `adb` 与 `scrcpy`，并加入 PATH
   - 安卓设备已开启开发者选项与无线调试（或通过 USB + `adb tcpip 5555`）
+- 安卓ADB直连前置条件：
+  - 目标安卓设备已开启开发者模式与ADB网络调试（`adb tcpip 5555`）
+  - 首次连接通常需要在目标设备确认调试授权
 
 ## GitHub Actions（已配置）
 工作流文件：`.github/workflows/flutter-build.yml`

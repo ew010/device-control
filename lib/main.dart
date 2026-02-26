@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:phonecontrol/android_adb_controller.dart';
 import 'package:phonecontrol/native_input_injector.dart';
 import 'package:phonecontrol/scrcpy_bridge.dart';
 
@@ -298,6 +299,7 @@ class ControllerPage extends StatefulWidget {
 class _ControllerPageState extends State<ControllerPage> {
   final ControllerClient _client = ControllerClient();
   final ScrcpyBridge _scrcpy = ScrcpyBridge();
+  final AndroidAdbController _adb = AndroidAdbController();
   final TextEditingController _hostController = TextEditingController();
   final TextEditingController _portController = TextEditingController(
     text: '8888',
@@ -317,6 +319,7 @@ class _ControllerPageState extends State<ControllerPage> {
     _textController.dispose();
     _client.dispose();
     _scrcpy.dispose();
+    _adb.dispose();
     super.dispose();
   }
 
@@ -346,6 +349,11 @@ class _ControllerPageState extends State<ControllerPage> {
   void _sendText() {
     final text = _textController.text;
     if (text.isEmpty) {
+      return;
+    }
+    if (_adb.enabled) {
+      unawaited(_adb.injectText(text));
+      _textController.clear();
       return;
     }
     _client.sendCommand({'type': 'command', 'command': 'text', 'text': text});
@@ -378,15 +386,32 @@ class _ControllerPageState extends State<ControllerPage> {
     }
   }
 
+  Future<void> _toggleAdb(bool value) async {
+    await _adb.toggleEnabled(value);
+    if (!value) {
+      return;
+    }
+    final host = _hostController.text.trim();
+    final port = int.tryParse(_adbPortController.text) ?? 5555;
+    await _adb.connect(host: host, port: port);
+    if (!mounted) {
+      return;
+    }
+    if (_adb.lastError != null) {
+      _showSnack(_adb.lastError!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('控制端')),
       body: AnimatedBuilder(
-        animation: Listenable.merge([_client, _scrcpy]),
+        animation: Listenable.merge([_client, _scrcpy, _adb]),
         builder: (context, _) {
           final state = _client.lastState;
           final supportScrcpy = Platform.isWindows || Platform.isMacOS;
+          final supportAndroidAdb = Platform.isAndroid;
           return Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -428,6 +453,41 @@ class _ControllerPageState extends State<ControllerPage> {
                 Text('连接状态: ${_client.connected ? '已连接' : '未连接'}'),
                 Text('鉴权状态: ${_client.authenticated ? '已授权' : '未授权'}'),
                 Text('会话信息: ${_client.sessionMessage}'),
+                if (supportAndroidAdb)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Wrap(
+                          spacing: 10,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            const Text('安卓ADB直连'),
+                            Switch(value: _adb.enabled, onChanged: _toggleAdb),
+                            OutlinedButton(
+                              onPressed: () async {
+                                final host = _hostController.text.trim();
+                                final port =
+                                    int.tryParse(_adbPortController.text) ??
+                                    5555;
+                                await _adb.connect(host: host, port: port);
+                                if (!mounted) {
+                                  return;
+                                }
+                                if (_adb.lastError != null) {
+                                  _showSnack(_adb.lastError!);
+                                }
+                              },
+                              child: const Text('重连ADB'),
+                            ),
+                            Text(_adb.status),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 if (supportScrcpy)
                   Padding(
                     padding: const EdgeInsets.only(top: 10),
@@ -465,6 +525,10 @@ class _ControllerPageState extends State<ControllerPage> {
                   child: RemoteSurface(
                     state: state,
                     onTap: (point) {
+                      if (_adb.enabled) {
+                        unawaited(_adb.injectTap(point.dx, point.dy));
+                        return;
+                      }
                       _client.sendCommand({
                         'type': 'command',
                         'command': 'tap',
@@ -473,6 +537,12 @@ class _ControllerPageState extends State<ControllerPage> {
                       });
                     },
                     onDrag: (from, to) {
+                      if (_adb.enabled) {
+                        unawaited(
+                          _adb.injectDrag(from.dx, from.dy, to.dx, to.dy),
+                        );
+                        return;
+                      }
                       _client.sendCommand({
                         'type': 'command',
                         'command': 'drag',
