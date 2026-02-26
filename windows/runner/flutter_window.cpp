@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <chrono>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <thread>
@@ -17,10 +18,19 @@ double ReadDoubleArg(const flutter::EncodableMap* args,
     return fallback;
   }
   auto it = args->find(flutter::EncodableValue(key));
-  if (it == args->end() || !it->second.IsDouble()) {
+  if (it == args->end()) {
     return fallback;
   }
-  return it->second.DoubleValue();
+  if (const auto* v = std::get_if<double>(&it->second)) {
+    return *v;
+  }
+  if (const auto* v = std::get_if<int32_t>(&it->second)) {
+    return static_cast<double>(*v);
+  }
+  if (const auto* v = std::get_if<int64_t>(&it->second)) {
+    return static_cast<double>(*v);
+  }
+  return fallback;
 }
 
 std::string ReadStringArg(const flutter::EncodableMap* args, const char* key) {
@@ -28,10 +38,13 @@ std::string ReadStringArg(const flutter::EncodableMap* args, const char* key) {
     return "";
   }
   auto it = args->find(flutter::EncodableValue(key));
-  if (it == args->end() || !it->second.IsString()) {
+  if (it == args->end()) {
     return "";
   }
-  return it->second.StringValue();
+  if (const auto* v = std::get_if<std::string>(&it->second)) {
+    return *v;
+  }
+  return "";
 }
 
 LONG ToAbsoluteX(double x_norm) {
